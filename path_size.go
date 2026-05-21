@@ -6,12 +6,16 @@ import (
 )
 
 func GetPathSize(path string) (string, error) {
-	// Проверяем путь на существование и ошибки
+	// Проверяем путь на существование, доступ и ошибки
 	info, err := os.Lstat(path)
-	if os.IsNotExist(err) {
-		return "", fmt.Errorf("путь не существует: %s", path)
-	} else if err != nil {
-		return "", fmt.Errorf("ошибка доступа: %w", err)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return "", fmt.Errorf("файл или директория не существует: %s", path)
+		} else if os.IsPermission(err) {
+			return "", fmt.Errorf("нет прав доступа к %s", path)
+		} else {
+			return "", fmt.Errorf("неизвестная ошибка при доступе к %s: %w", path, err)
+		}
 	}
 
 	// Проверяем тип на файл/директорию
