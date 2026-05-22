@@ -5,7 +5,7 @@ import (
 	"os"
 )
 
-func GetPathSize(path string) (string, error) {
+func GetPathSize(path string, human bool) (string, error) {
 	// Проверяем путь на существование, доступ и ошибки
 	info, err := os.Lstat(path)
 	if err != nil {
@@ -20,7 +20,11 @@ func GetPathSize(path string) (string, error) {
 
 	// Проверяем тип на файл/директорию
 	if !info.IsDir() {
-		return formatSize(info.Size()), nil // Файл - отпраляем объём, nil
+		if human {
+			return formatSize(info.Size()), nil // Файл - отпраляем объём, nil
+		} else {
+			return fmt.Sprintf("%d", info.Size()), nil
+		}
 	}
 
 	// Если директория — суммируем размеры файлов первого уровня
@@ -41,7 +45,11 @@ func GetPathSize(path string) (string, error) {
 		}
 		totalSize += entryInfo.Size()
 	}
-	return formatSize(totalSize), nil
+	if human {
+		return formatSize(totalSize), nil
+	} else {
+		return fmt.Sprintf("%d", totalSize), nil
+	}
 }
 
 // formatSize преобразует байты в удобочитаемый формат
@@ -50,16 +58,23 @@ func formatSize(bytes int64) string {
 		KB = 1024
 		MB = 1024 * KB
 		GB = 1024 * MB
+		TB = 1024 * GB
+		PB = 1024 * TB
+		EB = 1024 * PB
 	)
 
 	switch {
 	case bytes < KB:
 		return fmt.Sprintf("%dB", bytes)
 	case bytes < MB:
-		return fmt.Sprintf("%.1fK", float64(bytes)/KB)
+		return fmt.Sprintf("%.1fKB", float64(bytes)/KB)
 	case bytes < GB:
-		return fmt.Sprintf("%.1fM", float64(bytes)/MB)
+		return fmt.Sprintf("%.1fMB", float64(bytes)/MB)
+	case bytes < TB:
+		return fmt.Sprintf("%.1fGB", float64(bytes)/GB)
+	case bytes < PB:
+		return fmt.Sprintf("%.1fTB", float64(bytes)/TB)
 	default:
-		return fmt.Sprintf("%.1fG", float64(bytes)/GB)
+		return fmt.Sprintf("%.1fPB", float64(bytes)/PB)
 	}
 }

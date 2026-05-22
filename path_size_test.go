@@ -50,7 +50,7 @@ func TestGetPathSize_File_1KB(t *testing.T) {
 	testFile := "testdata/file_1kb"
 	expectedSizeBytes := int64(1024)
 
-	sizeStr, err := GetPathSize(testFile)
+	sizeStr, err := GetPathSize(testFile, false)
 	if err != nil {
 		t.Errorf("Ошибка GetPathSize() для файла %s: %v", testFile, err)
 	}
@@ -70,7 +70,7 @@ func TestGetPathSize_File_2KB(t *testing.T) {
 	testFile := "testdata/file_2kb"
 	expectedSizeBytes := int64(2048)
 
-	sizeStr, err := GetPathSize(testFile)
+	sizeStr, err := GetPathSize(testFile, false)
 	if err != nil {
 		t.Errorf("Ошибка GetPathSize() для файла %s: %v", testFile, err)
 	}
@@ -90,7 +90,7 @@ func TestGetPathSize_AnotherFile_1_5KB(t *testing.T) {
 	testFile := "testdata/another_file"
 	expectedSizeBytes := int64(1536)
 
-	sizeStr, err := GetPathSize(testFile)
+	sizeStr, err := GetPathSize(testFile, false)
 	if err != nil {
 		t.Errorf("Ошибка GetPathSize() для файла %s: %v", testFile, err)
 	}
@@ -110,7 +110,7 @@ func TestGetPathSize_SmallFile_512B(t *testing.T) {
 	testFile := "testdata/subdir/small_file"
 	expectedSizeBytes := int64(512)
 
-	sizeStr, err := GetPathSize(testFile)
+	sizeStr, err := GetPathSize(testFile, false)
 	if err != nil {
 		t.Errorf("Ошибка GetPathSize() для файла %s: %v", testFile, err)
 	}
@@ -132,7 +132,7 @@ func TestGetPathSize_Directory_Root(t *testing.T) {
 	// 1024 + 2048 + 1536 = 4568 байт ≈ 4.5K
 	expectedSizeBytes := int64(4568)
 
-	sizeStr, err := GetPathSize(testDir)
+	sizeStr, err := GetPathSize(testDir, false)
 	if err != nil {
 		t.Errorf("Ошибка GetPathSize() для директории %s: %v", testDir, err)
 	}
@@ -153,7 +153,7 @@ func TestGetPathSize_Subdirectory(t *testing.T) {
 	subDir := "testdata/subdir"
 	expectedSizeBytes := int64(512)
 
-	sizeStr, err := GetPathSize(subDir)
+	sizeStr, err := GetPathSize(subDir, false)
 	if err != nil {
 		t.Errorf("Ошибка GetPathSize() для поддиректории %s: %v", subDir, err)
 	}
@@ -172,7 +172,7 @@ func TestGetPathSize_Subdirectory(t *testing.T) {
 func TestGetPathSize_Nonexistent(t *testing.T) {
 	nonexistent := "testdata/nonexistent_file"
 
-	_, err := GetPathSize(nonexistent)
+	_, err := GetPathSize(nonexistent, false)
 	if err == nil {
 		t.Error("GetPathSize() должна возвращать ошибку для несуществующего пути")
 	}
@@ -188,9 +188,13 @@ func TestGetPathSize_EmptyDirectory(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Не удалось создать пустую директорию: %v", err)
 	}
-	defer os.RemoveAll(emptyDir)
+	defer func() {
+		if err := os.RemoveAll(emptyDir); err != nil {
+			t.Logf("Ошибка при удалении директории %s: %v", emptyDir, err)
+		}
+	}()
 
-	sizeStr, err := GetPathSize(emptyDir)
+	sizeStr, err := GetPathSize(emptyDir, false)
 	if err != nil {
 		t.Errorf("Ошибка GetPathSize() для пустой директории: %v", err)
 	}
@@ -212,7 +216,7 @@ func TestGetPathSize_DirectoryWithSubdirectories(t *testing.T) {
 	// 1024 + 2048 + 1536 = 4568 байт ≈ 4.5K
 	expectedSizeBytes := int64(4568)
 
-	sizeStr, err := GetPathSize(testDir)
+	sizeStr, err := GetPathSize(testDir, false)
 	if err != nil {
 		t.Errorf("Ошибка GetPathSize() для директории %s: %v", testDir, err)
 	}
@@ -236,14 +240,44 @@ func TestGetPathSize_ReadDirError(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Не удалось создать директорию с ошибкой доступа: %v", err)
 	}
-	defer os.RemoveAll(errorDir)
+	defer func() {
+		if err := os.RemoveAll(errorDir); err != nil {
+			t.Logf("Ошибка при удалении директории %s: %v", errorDir, err)
+		}
+	}()
 
-	_, err = GetPathSize(errorDir)
+	_, err = GetPathSize(errorDir, false)
 	if err == nil {
 		t.Error("GetPathSize() должна возвращать ошибку, когда директорию невозможно прочитать")
 	}
 
 	if !strings.Contains(err.Error(), "ошибка чтения директории") {
 		t.Errorf("Ожидалась ошибка 'ошибка чтения директории', получена: %v", err)
+	}
+}
+
+func TestGetPathSize_File_1KB_Human(t *testing.T) {
+	testFile := "testdata/file_1kb"
+	sizeStr, err := GetPathSize(testFile, true) // human = true
+	if err != nil {
+		t.Errorf("Ошибка GetPathSize() с флагом human для файла %s: %v", testFile, err)
+	}
+
+	// Проверяем, что результат содержит "KB" и не равен "0B"
+	if !strings.Contains(sizeStr, "KB") || strings.Contains(sizeStr, "0B") {
+		t.Errorf("Ожидался удобочитаемый формат (KB), получено: %s", sizeStr)
+	}
+}
+
+func TestGetPathSize_Directory_Root_Human(t *testing.T) {
+	testDir := "testdata"
+	sizeStr, err := GetPathSize(testDir, true) // human = true
+	if err != nil {
+		t.Errorf("Ошибка GetPathSize() с флагом human для директории %s: %v", testDir, err)
+	}
+
+	// Ожидаем "K" или "KB" для размера ~4.5 KB
+	if !strings.Contains(sizeStr, "K") {
+		t.Errorf("Ожидался удобочитаемый формат с 'K', получено: %s", sizeStr)
 	}
 }
