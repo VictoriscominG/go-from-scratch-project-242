@@ -16,22 +16,50 @@ func parseSizeString(sizeStr string) (int64, error) {
 		return 0, nil
 	}
 
+	const (
+		KB = 1024
+		MB = 1024 * KB
+		GB = 1024 * MB
+		TB = 1024 * GB
+		PB = 1024 * TB
+		EB = 1024 * PB
+	)
+
 	var multiplier int64 = 1
 	lastChar := sizeStr[len(sizeStr)-1]
 
 	switch lastChar {
 	case 'b':
-		// Если последний символ 'b', убираем его и оставляем multiplier = 1 (байты)
-		sizeStr = sizeStr[:len(sizeStr)-1]
-	case 'k':
-		multiplier = 1024
-		sizeStr = sizeStr[:len(sizeStr)-1]
-	case 'm':
-		multiplier = 1024 * 1024
-		sizeStr = sizeStr[:len(sizeStr)-1]
-	case 'g':
-		multiplier = 1024 * 1024 * 1024
-		sizeStr = sizeStr[:len(sizeStr)-1]
+		// Проверяем, есть ли перед 'b' ещё один символ (например, 'k', 'm' и т. д.)
+		if len(sizeStr) > 1 {
+			prevChar := sizeStr[len(sizeStr)-2]
+			switch prevChar {
+			case 'k':
+				multiplier = KB
+				sizeStr = sizeStr[:len(sizeStr)-2] // убираем 'kb'
+			case 'm':
+				multiplier = MB
+				sizeStr = sizeStr[:len(sizeStr)-2] // убираем 'mb'
+			case 'g':
+				multiplier = GB
+				sizeStr = sizeStr[:len(sizeStr)-2] // убираем 'gb'
+			case 't':
+				multiplier = TB
+				sizeStr = sizeStr[:len(sizeStr)-2] // убираем 'tb'
+			case 'p':
+				multiplier = PB
+				sizeStr = sizeStr[:len(sizeStr)-2] // убираем 'pb'
+			case 'e':
+				multiplier = EB
+				sizeStr = sizeStr[:len(sizeStr)-2] // убираем 'eb'
+			default:
+				// Если перед 'b' не суффикс, то это просто байты — убираем только 'b'
+				sizeStr = sizeStr[:len(sizeStr)-1]
+			}
+		} else {
+			// Одиночный 'b' — байты, multiplier = 1, убираем 'b'
+			sizeStr = sizeStr[:len(sizeStr)-1]
+		}
 	}
 
 	// Если после удаления суффикса строка пустая, считаем её равной "0"
@@ -43,9 +71,11 @@ func parseSizeString(sizeStr string) (int64, error) {
 	if err != nil {
 		return 0, fmt.Errorf("не удалось распарсить число '%s': %w", sizeStr, err)
 	}
+
 	return int64(num * float64(multiplier)), nil
 }
 
+// Проверяет, что функция GetPathSize корректно возвращает размер файла в байтах (1024 байт)
 func TestGetPathSize_File_1KB(t *testing.T) {
 	testFile := "testdata/file_1kb"
 	expectedSizeBytes := int64(1024)
@@ -66,6 +96,7 @@ func TestGetPathSize_File_1KB(t *testing.T) {
 	}
 }
 
+// Проверяет, что функция GetPathSize корректно возвращает размер файла в байтах (2048 байт)
 func TestGetPathSize_File_2KB(t *testing.T) {
 	testFile := "testdata/file_2kb"
 	expectedSizeBytes := int64(2048)
@@ -86,6 +117,7 @@ func TestGetPathSize_File_2KB(t *testing.T) {
 	}
 }
 
+// Проверяет, что функция GetPathSize корректно возвращает размер файла в байтах (1536 байт)
 func TestGetPathSize_AnotherFile_1_5KB(t *testing.T) {
 	testFile := "testdata/another_file"
 	expectedSizeBytes := int64(1536)
@@ -106,6 +138,7 @@ func TestGetPathSize_AnotherFile_1_5KB(t *testing.T) {
 	}
 }
 
+// Проверяет, что функция GetPathSize корректно возвращает размер файла в байтах (512 байт)
 func TestGetPathSize_SmallFile_512B(t *testing.T) {
 	testFile := "testdata/subdir/small_file"
 	expectedSizeBytes := int64(512)
@@ -126,6 +159,8 @@ func TestGetPathSize_SmallFile_512B(t *testing.T) {
 	}
 }
 
+// Проверяет, что функция GetPathSize корректно возвращает размер файлов
+// первого уровня директории в байтах (4568 байт)
 func TestGetPathSize_Directory_Root(t *testing.T) {
 	testDir := "testdata"
 	// Ожидаемый размер: только файлы первого уровня (file_1kb + file_2kb + another_file)
@@ -149,6 +184,8 @@ func TestGetPathSize_Directory_Root(t *testing.T) {
 	}
 }
 
+// Проверяет, что функция GetPathSize корректно возвращает размер файлов
+// первого уровня поддиректории в байтах (512 байт)
 func TestGetPathSize_Subdirectory(t *testing.T) {
 	subDir := "testdata/subdir"
 	expectedSizeBytes := int64(512)
@@ -169,6 +206,8 @@ func TestGetPathSize_Subdirectory(t *testing.T) {
 	}
 }
 
+// Проверяет, что функция GetPathSize корректно обрабатывает несуществующий путь,
+// должна вернуть ошибку с конкретным сообщением
 func TestGetPathSize_Nonexistent(t *testing.T) {
 	nonexistent := "testdata/nonexistent_file"
 
@@ -182,13 +221,14 @@ func TestGetPathSize_Nonexistent(t *testing.T) {
 	}
 }
 
+// Проверяет, что функция GetPathSize корректно возвращает 0 байт для пустой директории
 func TestGetPathSize_EmptyDirectory(t *testing.T) {
 	emptyDir := "testdata/empty_dir"
-	err := os.MkdirAll(emptyDir, 0755)
+	err := os.MkdirAll(emptyDir, 0755) //  создание пустой директории
 	if err != nil {
 		t.Fatalf("Не удалось создать пустую директорию: %v", err)
 	}
-	defer func() {
+	defer func() { //  настройка очистки после теста
 		if err := os.RemoveAll(emptyDir); err != nil {
 			t.Logf("Ошибка при удалении директории %s: %v", emptyDir, err)
 		}
@@ -209,30 +249,7 @@ func TestGetPathSize_EmptyDirectory(t *testing.T) {
 	}
 }
 
-func TestGetPathSize_DirectoryWithSubdirectories(t *testing.T) {
-	testDir := "testdata"
-	// Ожидаемый размер: только файлы первого уровня (file_1kb + file_2kb + another_file)
-	// Поддиректория subdir и её содержимое (small_file) не учитываются
-	// 1024 + 2048 + 1536 = 4568 байт ≈ 4.5K
-	expectedSizeBytes := int64(4568)
-
-	sizeStr, err := GetPathSize(testDir, false)
-	if err != nil {
-		t.Errorf("Ошибка GetPathSize() для директории %s: %v", testDir, err)
-	}
-
-	actualSizeBytes, err := parseSizeString(sizeStr)
-	if err != nil {
-		t.Errorf("Не удалось распарсить строку размера '%s': %v", sizeStr, err)
-	}
-
-	// Проверяем, что размер соответствует ожидаемому с учётом погрешности форматирования
-	if actualSizeBytes < expectedSizeBytes-100 || actualSizeBytes > expectedSizeBytes+100 {
-		t.Errorf("GetPathSize(%s) = %s (%d байт), ожидается приблизительно %d байт",
-			testDir, sizeStr, actualSizeBytes, expectedSizeBytes)
-	}
-}
-
+// Проверяет, что функция GetPathSize корректно возвращает ошибку для директории без права доступа
 func TestGetPathSize_ReadDirError(t *testing.T) {
 	// Создаём директорию, из которой нельзя прочитать содержимое
 	errorDir := "testdata/error_dir"
@@ -256,6 +273,8 @@ func TestGetPathSize_ReadDirError(t *testing.T) {
 	}
 }
 
+// Проверяет, что функция GetPathSize корректно возвращает размер файла в байтах (1024 байт),
+// в удобночитаемом формате
 func TestGetPathSize_File_1KB_Human(t *testing.T) {
 	testFile := "testdata/file_1kb"
 	sizeStr, err := GetPathSize(testFile, true) // human = true
@@ -269,6 +288,8 @@ func TestGetPathSize_File_1KB_Human(t *testing.T) {
 	}
 }
 
+// Проверяет, что функция GetPathSize корректно возвращает размер файлов первого
+// уровня в байтах (4568 байт), в удобночитаемом формате
 func TestGetPathSize_Directory_Root_Human(t *testing.T) {
 	testDir := "testdata"
 	sizeStr, err := GetPathSize(testDir, true) // human = true

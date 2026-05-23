@@ -19,9 +19,9 @@ func GetPathSize(path string, human bool) (string, error) {
 	}
 
 	// Проверяем тип на файл/директорию
-	if !info.IsDir() {
+	if !info.IsDir() { // файл - отпраляем объём, nil
 		if human {
-			return formatSize(info.Size()), nil // Файл - отпраляем объём, nil
+			return formatSize(info.Size()), nil
 		} else {
 			return fmt.Sprintf("%d", info.Size()), nil
 		}
@@ -36,12 +36,12 @@ func GetPathSize(path string, human bool) (string, error) {
 
 	for _, entry := range entries {
 		if entry.IsDir() {
-			continue // Пропускаем поддиректории
+			continue // пропускаем поддиректории
 		}
 
 		entryInfo, err := entry.Info()
 		if err != nil {
-			continue // Продолжаем обработку остальных файлов при ошибке с одним файлом
+			continue // продолжаем обработку остальных файлов при ошибке с одним файлом
 		}
 		totalSize += entryInfo.Size()
 	}
