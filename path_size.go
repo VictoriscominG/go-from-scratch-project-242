@@ -3,9 +3,10 @@ package path_size
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 )
 
-func GetPathSize(path string, human bool) (string, error) {
+func GetPathSize(path string, human, all bool) (string, error) {
 	// Проверяем путь на существование, доступ и ошибки
 	info, err := os.Lstat(path)
 	if err != nil {
@@ -18,8 +19,16 @@ func GetPathSize(path string, human bool) (string, error) {
 		}
 	}
 
+	IsHidden, err := IsHidden(path)
+	if err != nil {
+		return "", fmt.Errorf("Ошибка при проверке файла: %s", path)
+	}
+
 	// Проверяем тип на файл/директорию
 	if !info.IsDir() { // файл - отпраляем объём, nil
+		if IsHidden && !all {
+			return "", fmt.Errorf("файл или директория не существует: %s", path)
+		}
 		if human {
 			return formatSize(info.Size()), nil
 		} else {
@@ -38,7 +47,9 @@ func GetPathSize(path string, human bool) (string, error) {
 		if entry.IsDir() {
 			continue // пропускаем поддиректории
 		}
-
+		if len(entry.Name()) > 0 && entry.Name()[0] == '.' && !all { //определяем скрытый файл по "."
+			continue // пропускаем скрытые файлы если отсутсвует флаг all
+		}
 		entryInfo, err := entry.Info()
 		if err != nil {
 			continue // продолжаем обработку остальных файлов при ошибке с одним файлом
@@ -77,4 +88,14 @@ func formatSize(bytes int64) string {
 	default:
 		return fmt.Sprintf("%.1fPB", float64(bytes)/PB)
 	}
+}
+
+// IsHidden проверяет, является ли файл скрытым в Unix‑системах
+// Файл считается скрытым, если его имя начинается с точки (.)
+func IsHidden(path string) (bool, error) {
+	filename := filepath.Base(path)
+	if len(filename) == 0 {
+		return false, nil
+	}
+	return filename[0] == '.', nil
 }
