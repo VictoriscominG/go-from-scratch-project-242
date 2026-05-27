@@ -1,6 +1,7 @@
 package path_size
 
 import (
+	"code/config"
 	"fmt"
 	"os"
 	"strconv"
@@ -16,15 +17,6 @@ func parseSizeString(sizeStr string) (int64, error) {
 		return 0, nil
 	}
 
-	const (
-		KB = 1024
-		MB = 1024 * KB
-		GB = 1024 * MB
-		TB = 1024 * GB
-		PB = 1024 * TB
-		EB = 1024 * PB
-	)
-
 	var multiplier int64 = 1
 	lastChar := sizeStr[len(sizeStr)-1]
 
@@ -35,22 +27,22 @@ func parseSizeString(sizeStr string) (int64, error) {
 			prevChar := sizeStr[len(sizeStr)-2]
 			switch prevChar {
 			case 'k':
-				multiplier = KB
+				multiplier = config.KB
 				sizeStr = sizeStr[:len(sizeStr)-2] // убираем 'kb'
 			case 'm':
-				multiplier = MB
+				multiplier = config.MB
 				sizeStr = sizeStr[:len(sizeStr)-2] // убираем 'mb'
 			case 'g':
-				multiplier = GB
+				multiplier = config.GB
 				sizeStr = sizeStr[:len(sizeStr)-2] // убираем 'gb'
 			case 't':
-				multiplier = TB
+				multiplier = config.TB
 				sizeStr = sizeStr[:len(sizeStr)-2] // убираем 'tb'
 			case 'p':
-				multiplier = PB
+				multiplier = config.PB
 				sizeStr = sizeStr[:len(sizeStr)-2] // убираем 'pb'
 			case 'e':
-				multiplier = EB
+				multiplier = config.EB
 				sizeStr = sizeStr[:len(sizeStr)-2] // убираем 'eb'
 			default:
 				// Если перед 'b' не суффикс, то это просто байты — убираем только 'b'
@@ -67,6 +59,7 @@ func parseSizeString(sizeStr string) (int64, error) {
 		sizeStr = "0"
 	}
 
+	// Преобразуем строчное кол-во байт в int64
 	num, err := strconv.ParseFloat(sizeStr, 64)
 	if err != nil {
 		return 0, fmt.Errorf("не удалось распарсить число '%s': %w", sizeStr, err)
@@ -80,7 +73,7 @@ func TestGetPathSize_File_1KB(t *testing.T) {
 	testFile := "testdata/file_1kb"
 	expectedSizeBytes := int64(1024)
 
-	sizeStr, err := GetPathSize(testFile, false, false)
+	sizeStr, err := GetPathSize(testFile, false, false, false)
 	if err != nil {
 		t.Errorf("Ошибка GetPathSize() для файла %s: %v", testFile, err)
 	}
@@ -101,7 +94,7 @@ func TestGetPathSize_File_2KB(t *testing.T) {
 	testFile := "testdata/file_2kb"
 	expectedSizeBytes := int64(2048)
 
-	sizeStr, err := GetPathSize(testFile, false, false)
+	sizeStr, err := GetPathSize(testFile, false, false, false)
 	if err != nil {
 		t.Errorf("Ошибка GetPathSize() для файла %s: %v", testFile, err)
 	}
@@ -122,7 +115,7 @@ func TestGetPathSize_AnotherFile_1_5KB(t *testing.T) {
 	testFile := "testdata/another_file"
 	expectedSizeBytes := int64(1536)
 
-	sizeStr, err := GetPathSize(testFile, false, false)
+	sizeStr, err := GetPathSize(testFile, false, false, false)
 	if err != nil {
 		t.Errorf("Ошибка GetPathSize() для файла %s: %v", testFile, err)
 	}
@@ -143,7 +136,7 @@ func TestGetPathSize_SmallFile_512B(t *testing.T) {
 	testFile := "testdata/subdir/small_file"
 	expectedSizeBytes := int64(512)
 
-	sizeStr, err := GetPathSize(testFile, false, false)
+	sizeStr, err := GetPathSize(testFile, false, false, false)
 	if err != nil {
 		t.Errorf("Ошибка GetPathSize() для файла %s: %v", testFile, err)
 	}
@@ -163,11 +156,14 @@ func TestGetPathSize_SmallFile_512B(t *testing.T) {
 // первого уровня директории при отсутствии флага all в байтах (4568 байт)
 func TestGetPathSize_Directory_Root(t *testing.T) {
 	testDir := "testdata"
-	// Ожидаемый размер: только файлы первого уровня (file_1kb + file_2kb + another_file)
-	// 1024 + 2048 + 1536 = 4568 байт ≈ 4.5K
+
+	// Ожидаемый размер:
+	// file_1kb: 1024 B
+	// file_2kb: 2048 B
+	// another_file: 1536 B (1024 + 512)
 	expectedSizeBytes := int64(4568)
 
-	sizeStr, err := GetPathSize(testDir, false, false)
+	sizeStr, err := GetPathSize(testDir, false, false, false)
 	if err != nil {
 		t.Errorf("Ошибка GetPathSize() для директории %s: %v", testDir, err)
 	}
@@ -190,7 +186,7 @@ func TestGetPathSize_Subdirectory(t *testing.T) {
 	subDir := "testdata/subdir"
 	expectedSizeBytes := int64(512)
 
-	sizeStr, err := GetPathSize(subDir, false, false)
+	sizeStr, err := GetPathSize(subDir, false, false, false)
 	if err != nil {
 		t.Errorf("Ошибка GetPathSize() для поддиректории %s: %v", subDir, err)
 	}
@@ -211,7 +207,7 @@ func TestGetPathSize_Subdirectory(t *testing.T) {
 func TestGetPathSize_Nonexistent(t *testing.T) {
 	nonexistent := "testdata/nonexistent_file"
 
-	_, err := GetPathSize(nonexistent, false, false)
+	_, err := GetPathSize(nonexistent, false, false, false)
 	if err == nil {
 		t.Error("GetPathSize() должна возвращать ошибку для несуществующего пути")
 	}
@@ -224,17 +220,21 @@ func TestGetPathSize_Nonexistent(t *testing.T) {
 // Проверяет, что функция GetPathSize корректно возвращает 0 байт для пустой директории
 func TestGetPathSize_EmptyDirectory(t *testing.T) {
 	emptyDir := "testdata/empty_dir"
-	err := os.MkdirAll(emptyDir, 0755) //  создание пустой директории
+
+	// Создаем пустую директорию
+	err := os.MkdirAll(emptyDir, 0755)
 	if err != nil {
 		t.Fatalf("Не удалось создать пустую директорию: %v", err)
 	}
-	defer func() { //  настройка очистки после теста
+
+	// Удаляем созданную директорию после теста
+	defer func() {
 		if err := os.RemoveAll(emptyDir); err != nil {
 			t.Logf("Ошибка при удалении директории %s: %v", emptyDir, err)
 		}
 	}()
 
-	sizeStr, err := GetPathSize(emptyDir, false, false)
+	sizeStr, err := GetPathSize(emptyDir, false, false, false)
 	if err != nil {
 		t.Errorf("Ошибка GetPathSize() для пустой директории: %v", err)
 	}
@@ -251,19 +251,22 @@ func TestGetPathSize_EmptyDirectory(t *testing.T) {
 
 // Проверяет, что функция GetPathSize корректно возвращает ошибку для директории без права доступа
 func TestGetPathSize_ReadDirError(t *testing.T) {
+
 	// Создаём директорию, из которой нельзя прочитать содержимое
 	errorDir := "testdata/error_dir"
 	err := os.MkdirAll(errorDir, 0000) // Права 0000 — нет доступа
 	if err != nil {
 		t.Fatalf("Не удалось создать директорию с ошибкой доступа: %v", err)
 	}
+
+	// Удаляем созданную директорию после теста
 	defer func() {
 		if err := os.RemoveAll(errorDir); err != nil {
 			t.Logf("Ошибка при удалении директории %s: %v", errorDir, err)
 		}
 	}()
 
-	_, err = GetPathSize(errorDir, false, false)
+	_, err = GetPathSize(errorDir, false, false, false)
 	if err == nil {
 		t.Error("GetPathSize() должна возвращать ошибку, когда директорию невозможно прочитать")
 	}
@@ -277,7 +280,8 @@ func TestGetPathSize_ReadDirError(t *testing.T) {
 // в удобночитаемом формате
 func TestGetPathSize_File_1KB_Human(t *testing.T) {
 	testFile := "testdata/file_1kb"
-	sizeStr, err := GetPathSize(testFile, true, false) // human = true
+
+	sizeStr, err := GetPathSize(testFile, true, false, false) // human = true
 	if err != nil {
 		t.Errorf("Ошибка GetPathSize() с флагом human для файла %s: %v", testFile, err)
 	}
@@ -289,14 +293,18 @@ func TestGetPathSize_File_1KB_Human(t *testing.T) {
 }
 
 // Проверяет, что функция GetPathSize корректно возвращает размер файлов первого
-// уровня в байтах (4568 байт), в удобночитаемом формате
+// уровня с учётом скрытого файла в байтах (5632 байт), в удобночитаемом формате
 func TestGetPathSize_Directory_Root_Human_All(t *testing.T) {
 	testDir := "testdata"
-	// Ожидаемый размер: только файлы первого уровня (.hidden_file_1kb + file_1kb + file_2kb + another_file)
-	// 1024 + 1024 + 2048 + 1536 = 5632 байт ≈ 5.5K
+
+	// Ожидаемый размер:
+	// file_1kb: 1024 B
+	// file_2kb: 2048 B
+	// another_file: 1536 B (1024 + 512)
+	// .hidden_file_1kb: 1024 B
 	expectedSizeBytes := int64(5632)
 
-	sizeStr, err := GetPathSize(testDir, true, true) // human = true
+	sizeStr, err := GetPathSize(testDir, true, true, false) // human = true
 	if err != nil {
 		t.Errorf("Ошибка GetPathSize() с флагами human, all для директории %s: %v", testDir, err)
 	}
@@ -315,5 +323,35 @@ func TestGetPathSize_Directory_Root_Human_All(t *testing.T) {
 	if actualSizeBytes < expectedSizeBytes-100 || actualSizeBytes > expectedSizeBytes+100 {
 		t.Errorf("GetPathSize(%s) = %s (%d байт), ожидается приблизительно %d байт",
 			testDir, sizeStr, actualSizeBytes, expectedSizeBytes)
+	}
+}
+
+// Проверяет, что функция GetPathSize корректно возвращает размер всех файлов в директории при
+// включении флага recursive
+func TestGetPathSize_RecursiveTotalSize(t *testing.T) {
+	testDir := "testdata"
+
+	// Проверяем существование тестовой директории
+	if _, err := os.Stat(testDir); os.IsNotExist(err) {
+		t.Skipf("Пропускаем тест: директория %s не найдена. Создайте тестовые данные.", testDir)
+	}
+
+	// Вызываем функцию с рекурсией (recursive=true), human=false (в байтах),
+	// all=true (учитываем скрытые файлы)
+	result, err := GetPathSize(testDir, false, true, true)
+	if err != nil {
+		t.Fatalf("GetPathSize вернула ошибку: %v", err)
+	}
+
+	// Ожидаемый размер:
+	// file_1kb: 1024 B
+	// file_2kb: 2048 B
+	// subdir/small_file: 512 B
+	// another_file: 1536 B (1024 + 512)
+	// .hidden_file_1kb: 1024 B
+	expectedSize := "6144"
+
+	if result != expectedSize {
+		t.Errorf("Ожидаемый размер %s байт, получен %s", expectedSize, result)
 	}
 }

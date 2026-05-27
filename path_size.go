@@ -1,12 +1,15 @@
 package path_size
 
 import (
+	"code/config"
 	"fmt"
+	"log"
 	"os"
 	"path/filepath"
+	"strconv"
 )
 
-func GetPathSize(path string, human, all bool) (string, error) {
+func GetPathSize(path string, human, all, recursive bool) (string, error) {
 	// Проверяем путь на существование, доступ и ошибки
 	info, err := os.Lstat(path)
 	if err != nil {
@@ -19,15 +22,16 @@ func GetPathSize(path string, human, all bool) (string, error) {
 		}
 	}
 
-	IsHidden, err := IsHidden(path)
+	// Проверяем путь на скрытность файла/директории
+	isHidden, err := IsHidden(path)
 	if err != nil {
-		return "", fmt.Errorf("Ошибка при проверке файла: %s", path)
+		return "", fmt.Errorf("ошибка при проверке скрытности файла %s: %v", path, err)
 	}
 
-	// Проверяем тип на файл/директорию
-	if !info.IsDir() { // файл - отпраляем объём, nil
-		if IsHidden && !all {
-			return "", fmt.Errorf("файл или директория не существует: %s", path)
+	// Проверяем тип на файл, выводим информацию учитывая флаги all | human
+	if !info.IsDir() {
+		if isHidden && !all {
+			return "", fmt.Errorf("скрытый файл '%s' пропущен (используйте флаг -a для включения)", path)
 		}
 		if human {
 			return formatSize(info.Size()), nil
@@ -44,18 +48,55 @@ func GetPathSize(path string, human, all bool) (string, error) {
 	}
 
 	for _, entry := range entries {
-		if entry.IsDir() {
-			continue // пропускаем поддиректории
+		if entry == nil {
+			log.Printf("ПРОПУСКАЕМ: entry == nil в каталоге %s", path)
+			continue
 		}
-		if len(entry.Name()) > 0 && entry.Name()[0] == '.' && !all { //определяем скрытый файл по "."
-			continue // пропускаем скрытые файлы если отсутсвует флаг all
-		}
-		entryInfo, err := entry.Info()
+
+		// Создаёт полный путь, автоматически выбирая разделитель (\ для Windows, / для Unix‑систем)
+		entryPath := filepath.Join(path, entry.Name())
+
+		// Проверяем путь на скрытность файла/директории
+		isHiddenEntry, err := IsHidden(entryPath)
 		if err != nil {
-			continue // продолжаем обработку остальных файлов при ошибке с одним файлом
+			log.Printf("ПРЕДУПРЕЖДЕНИЕ: ошибка проверки скрытости %s: %v", entryPath, err)
+			continue
 		}
-		totalSize += entryInfo.Size()
+
+		// Пропускаем скрытый файл/директорию при отсутствии флага all
+		if isHiddenEntry && !all {
+			continue
+		}
+
+		// Получаем информацию о файле, добавляем в вывод
+		if !entry.IsDir() {
+			entryInfo, err := entry.Info()
+			if err != nil {
+				log.Printf("ПРЕДУПРЕЖДЕНИЕ: не удалось получить информацию о %s: %v", entryPath, err)
+				continue
+			}
+			totalSize += entryInfo.Size()
+		}
+
+		// Если директория и включен флаг рекурсивного обхода (recursive)
+		if entry.IsDir() && recursive {
+			// При рекурсии запрашиваем размер в байтах (human=false)
+			subSizeStr, err := GetPathSize(entryPath, false, all, true)
+			if err != nil {
+				log.Printf("ПРЕДУПРЕЖДЕНИЕ: не удалось обработать поддиректорию %s: %v", entryPath, err)
+				continue
+			}
+
+			// Преобразуем строчное кол-во байт в int64
+			subSizeValue, err := strconv.ParseInt(subSizeStr, 10, 64)
+			if err != nil {
+				log.Printf("ПРЕДУПРЕЖДЕНИЕ: ошибка парсинга размера %s для %s: %v", subSizeStr, entryPath, err)
+				continue
+			}
+			totalSize += subSizeValue
+		}
 	}
+
 	if human {
 		return formatSize(totalSize), nil
 	} else {
@@ -65,33 +106,25 @@ func GetPathSize(path string, human, all bool) (string, error) {
 
 // formatSize преобразует байты в удобочитаемый формат
 func formatSize(bytes int64) string {
-	const (
-		KB = 1024
-		MB = 1024 * KB
-		GB = 1024 * MB
-		TB = 1024 * GB
-		PB = 1024 * TB
-		EB = 1024 * PB
-	)
-
 	switch {
-	case bytes < KB:
+	case bytes < config.KB:
 		return fmt.Sprintf("%dB", bytes)
-	case bytes < MB:
-		return fmt.Sprintf("%.1fKB", float64(bytes)/KB)
-	case bytes < GB:
-		return fmt.Sprintf("%.1fMB", float64(bytes)/MB)
-	case bytes < TB:
-		return fmt.Sprintf("%.1fGB", float64(bytes)/GB)
-	case bytes < PB:
-		return fmt.Sprintf("%.1fTB", float64(bytes)/TB)
+	case bytes < config.MB:
+		return fmt.Sprintf("%.1fKB", float64(bytes)/config.KB)
+	case bytes < config.GB:
+		return fmt.Sprintf("%.1fMB", float64(bytes)/config.MB)
+	case bytes < config.TB:
+		return fmt.Sprintf("%.1fGB", float64(bytes)/config.GB)
+	case bytes < config.PB:
+		return fmt.Sprintf("%.1fTB", float64(bytes)/config.TB)
+	case bytes < config.EB:
+		return fmt.Sprintf("%.1fPB", float64(bytes)/config.PB)
 	default:
-		return fmt.Sprintf("%.1fPB", float64(bytes)/PB)
+		return fmt.Sprintf("%.1fEB", float64(bytes)/config.EB)
 	}
 }
 
 // IsHidden проверяет, является ли файл скрытым в Unix‑системах
-// Файл считается скрытым, если его имя начинается с точки (.)
 func IsHidden(path string) (bool, error) {
 	filename := filepath.Base(path)
 	if len(filename) == 0 {
