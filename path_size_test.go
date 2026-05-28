@@ -1,4 +1,4 @@
-package path_size
+package code
 
 import (
 	"code/config"
