@@ -1,4 +1,4 @@
-package path_size
+package code
 
 import (
 	"code/config"
@@ -349,7 +349,7 @@ func TestGetPathSize_RecursiveTotalSize(t *testing.T) {
 	// subdir/small_file: 512 B
 	// another_file: 1536 B (1024 + 512)
 	// .hidden_file_1kb: 1024 B
-	expectedSize := "6144"
+	expectedSize := "6144B"
 
 	if result != expectedSize {
 		t.Errorf("Ожидаемый размер %s байт, получен %s", expectedSize, result)
