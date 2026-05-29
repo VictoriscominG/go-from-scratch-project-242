@@ -25,7 +25,7 @@ var sizeUnits = []sizeUnit{
 }
 
 // GetPathSize возвращает размер файла или директории.
-func GetPathSize(path string, human, all, recursive bool) (string, error) {
+func GetPathSize(path string, recursive, human, all bool) (string, error) {
 	info, err := os.Lstat(path)
 	if err != nil {
 		switch {
@@ -69,14 +69,11 @@ func walkDir(path string, all, recursive bool) (int64, error) {
 
 	var total int64
 	for _, entry := range entries {
-		if isHiddenName(entry.Name()) && !all {
-			continue
-		}
-
 		entryPath := filepath.Join(path, entry.Name())
 
 		if entry.IsDir() {
 			if recursive {
+				// В скрытую директорию всегда заходим, но фильтруем содержимое
 				subSize, err := walkDir(entryPath, all, true)
 				if err != nil {
 					log.Printf("ПРЕДУПРЕЖДЕНИЕ: не удалось обработать поддиректорию %s: %v", entryPath, err)
@@ -84,6 +81,11 @@ func walkDir(path string, all, recursive bool) (int64, error) {
 				}
 				total += subSize
 			}
+			continue
+		}
+
+		// Пропускаем скрытые файлы, если флаг all не установлен
+		if isHiddenName(entry.Name()) && !all {
 			continue
 		}
 

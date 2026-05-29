@@ -39,13 +39,13 @@ func main() {
 			}
 			path := args[0] // берём первый аргумент (путь)
 
+			recursive := cmd.Bool("recursive") // получаем значение флага recursive
+
 			human := cmd.Bool("human") // получаем значение флага human
 
 			all := cmd.Bool("all") // получаем значение флага all
 
-			recursive := cmd.Bool("recursive") // получаем значение флага recursive
-
-			result, err := path_size.GetPathSize(path, human, all, recursive)
+			result, err := path_size.GetPathSize(path, recursive, human, all)
 			if err != nil {
 				return err
 			}

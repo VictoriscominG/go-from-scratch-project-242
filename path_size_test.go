@@ -281,7 +281,7 @@ func TestGetPathSize_ReadDirError(t *testing.T) {
 func TestGetPathSize_File_1KB_Human(t *testing.T) {
 	testFile := "testdata/file_1kb"
 
-	sizeStr, err := GetPathSize(testFile, true, false, false) // human = true
+	sizeStr, err := GetPathSize(testFile, false, true, false) // human = true
 	if err != nil {
 		t.Errorf("Ошибка GetPathSize() с флагом human для файла %s: %v", testFile, err)
 	}
@@ -304,7 +304,7 @@ func TestGetPathSize_Directory_Root_Human_All(t *testing.T) {
 	// .hidden_file_1kb: 1024 B
 	expectedSizeBytes := int64(5632)
 
-	sizeStr, err := GetPathSize(testDir, true, true, false) // human = true
+	sizeStr, err := GetPathSize(testDir, false, true, true) // human = true, all = true
 	if err != nil {
 		t.Errorf("Ошибка GetPathSize() с флагами human, all для директории %s: %v", testDir, err)
 	}
@@ -338,7 +338,7 @@ func TestGetPathSize_RecursiveTotalSize(t *testing.T) {
 
 	// Вызываем функцию с рекурсией (recursive=true), human=false (в байтах),
 	// all=true (учитываем скрытые файлы)
-	result, err := GetPathSize(testDir, false, true, true)
+	result, err := GetPathSize(testDir, true, false, true)
 	if err != nil {
 		t.Fatalf("GetPathSize вернула ошибку: %v", err)
 	}
